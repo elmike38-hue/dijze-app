@@ -3,97 +3,87 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 1. CONFIGURACIÓN DE PÁGINA
+# 1. CONFIGURACIÓN
 st.set_page_config(page_title="Dijze Pro", page_icon="🪚")
 
-# 2. FUNCIÓN DE REDONDEO PSICOLÓGICO
+# 2. FUNCIÓN PARA LIMPIAR TODO
+def limpiar_formulario():
+    st.session_state["cliente"] = ""
+    st.session_state["proyecto"] = ""
+    st.session_state["maquila"] = 0.0
+    st.session_state["accesorios"] = 0.0
+    st.rerun()
+
+# 3. REDONDEO
 def redondear_psicologico_dijze(numero):
     numero = int(numero)
-    # Terminaciones que nos gustan para que el precio se vea "atractivo"
     terminaciones = [36, 38, 39, 63, 68, 69, 83, 86, 89, 93, 96, 98]
-    # Sumamos un margen de seguridad de 550 antes de redondear
     objetivo = numero + 550 
     base_centena = (objetivo // 100) * 100
     unidad_y_decena = objetivo % 100
-    
     for t in terminaciones:
         if t > unidad_y_decena:
-            # Evitamos que la centena y la decena sean iguales (ej. 336)
             if (base_centena // 100) % 10 != t // 10:
                 return base_centena + t
-    # Si no encuentra en la centena actual, salta a la siguiente
     return (base_centena + 100) + terminaciones[0]
 
-# 3. CONEXIÓN A GOOGLE SHEETS
-# Esta conexión usa los Secrets que pegamos en Streamlit Cloud
+# 4. CONEXIÓN (Sin caché para evitar sobrescribir)
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 4. INTERFAZ DE USUARIO
 st.title("🪚 Carpintería Dijze")
-st.markdown("### Cotizador Profesional v1.2")
 
-# Formulario para evitar recargas innecesarias
-with st.form("cotizador_form", clear_on_submit=False):
-    nombre_cliente = st.text_input("Nombre del Cliente")
-    nombre_proyecto = st.text_input("Proyecto (ej. Closet de Cedro)")
+# 5. FORMULARIO CON LLAVES (KEYS) PARA LIMPIEZA
+with st.form("cotizador_form"):
+    st.text_input("Nombre del Cliente", key="cliente")
+    st.text_input("Proyecto", key="proyecto")
     
     col1, col2 = st.columns(2)
     with col1:
-        c_maquila = st.number_input("Costo de la maquila", min_value=0.0, step=100.0)
+        st.number_input("Costo de la maquila", min_value=0.0, step=100.0, key="maquila")
     with col2:
-        c_accesorios = st.number_input("Costo en accesorios", min_value=0.0, step=100.0)
+        st.number_input("Costo en accesorios", min_value=0.0, step=100.0, key="accesorios")
     
-    # Botón principal del formulario
-    submit = st.form_submit_button("Generar Propuesta y Guardar")
+    submit = st.form_submit_button("Generar y Guardar")
 
-# 5. LÓGICA AL ENVIAR EL FORMULARIO
+# 6. ACCIÓN AL GUARDAR
 if submit:
-    if nombre_cliente and nombre_proyecto:
-        # Cálculo base: Margen del 30% (Dividir entre 0.7)
-        inv_base = (c_maquila + c_accesorios) / 0.7
+    # Extraemos los valores de las "keys"
+    nombre = st.session_state["cliente"]
+    proy = st.session_state["proyecto"]
+    maq = st.session_state["maquila"]
+    acc = st.session_state["accesorios"]
+
+    if nombre and proy:
+        inv_base = (maq + acc) / 0.7
         precio_final = redondear_psicologico_dijze(inv_base)
         fecha_hoy = datetime.now().strftime("%d/%m/%Y")
         
-        # --- GUARDAR EN GOOGLE SHEETS ---
-        # Creamos un pequeño DataFrame para anexar
-        nueva_fila = pd.DataFrame([{
-            "Fecha": fecha_hoy,
-            "Cliente": nombre_cliente,
-            "Proyecto": nombre_proyecto,
-            "Inversion_Total": precio_final
-        }])
-        
         try:
-            # Leemos lo que hay actualmente
-            df_existente = conn.read()
-            # Concatenamos la nueva fila al final
-            df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
-            # Actualizamos la hoja completa (esto evita que se repitan filas en el mismo renglón)
-            conn.update(data=df_actualizado)
-            st.success("✅ Datos guardados en Google Sheets")
+            # Leemos la hoja actual (ttl=0 para datos frescos)
+            df_actual = conn.read(ttl=0)
+            
+            # Creamos la fila nueva
+            nueva_fila = pd.DataFrame([{
+                "Fecha": fecha_hoy,
+                "Cliente": nombre,
+                "Proyecto": proy,
+                "Inversion_Total": precio_final
+            }])
+            
+            # Unimos y subimos todo
+            df_final = pd.concat([df_actual, nueva_fila], ignore_index=True)
+            conn.update(data=df_final)
+            
+            st.success(f"✅ Guardado: {nombre} - ${precio_final:,.0f}")
+            
+            # Mensaje WhatsApp
+            mensaje = f"Hola {nombre}, presupuesto para {proy}: ${precio_final:,.0f}. ¿Agendamos?"
+            st.text_area("Copia esto:", mensaje)
+            
         except Exception as e:
-            st.error(f"Error al guardar en la nube: {e}")
-        
-        # --- GENERAR MENSAJE ---
-        mensaje = (
-            f"Hola {nombre_cliente}, que gusto saludarte, gracias por la confianza.\n\n"
-            f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
-            f"Fabricación y Ensamble de {nombre_proyecto} ${precio_final:,.0f}\n\n"
-            f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
-            f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
-            f"En este momento podemos ofrecerlo de esta forma ya que hemos estado trabajando en sitio. "
-            f"Además, nuestra agenda de fabricación para las próximas semanas está por llenarse; "
-            f"solo nos quedan unos días disponibles.\n\n"
-            f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días acudir contigo "
-            f"definir dimensiones, materiales y poder comenzar el trabajo en próximos días disponibles?"
-        )
-        
-        st.subheader("Mensaje para WhatsApp:")
-        st.text_area("Copia este texto:", mensaje, height=300)
-        
+            st.error(f"Error: {e}")
     else:
-        st.warning("⚠️ Por favor completa el nombre del cliente y el proyecto.")
+        st.error("Faltan datos")
 
-# 6. BOTÓN DE REINICIO (Fuera del formulario)
-if st.button("🔄 Nueva Cotización"):
-    st.rerun()
+# 7. BOTÓN DE REINICIO REAL
+st.button("🔄 Nueva Cotización (Limpiar todo)", on_click=limpiar_formulario)
