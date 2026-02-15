@@ -68,13 +68,9 @@ if submit:
                 f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
             )
             
-            st.subheader("Copia el mensaje aquí abajo:")
-            # st.code genera el recuadro con el botón de "Copiar" automático
+            st.markdown("### 📋 Mensaje para copiar:")
+            # Este bloque crea el cuadro con el botón de copiar automático
             st.code(mensaje, language=None)
-            
-            # Botón opcional para abrir WhatsApp directamente
-            link_wa = f"https://wa.me/?text={mensaje.replace(' ', '%20').replace('\n', '%0A')}"
-            st.link_button("📲 Enviar directo a WhatsApp", link_wa)
             
         except Exception as e:
             st.error(f"Error al guardar: {e}")
