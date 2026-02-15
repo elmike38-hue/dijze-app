@@ -3,7 +3,7 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# 1. CONFIGURACIÓN
+# 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Dijze Pro", page_icon="🪚")
 
 # 2. FUNCIÓN DE REDONDEO
@@ -24,8 +24,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("🪚 Carpintería Dijze")
 
-# 4. FORMULARIO SIMPLE
-# Usamos 'key' para que Streamlit sepa qué limpiar
+# 4. FORMULARIO
 with st.form("cotizador_form", clear_on_submit=True):
     nombre = st.text_input("Nombre del Cliente")
     proyecto = st.text_input("Proyecto")
@@ -59,31 +58,29 @@ if submit:
             
             st.success(f"✅ Guardado con éxito")
             
-            # --- AQUÍ ESTÁ EL TEXTO DE WHATSAPP ---
-           mensaje = (
-            f"Hola {nombre}, que gusto saludarte, gracias por la confianza.\n\n"
-            f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
-            f"Fabricación y Ensamble de {proyecto} ${precio_final:,.0f}\n\n"
-            f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
-            f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
-            f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
-        )
-        
-        st.subheader("Propuesta lista:")
-        # st.code crea un cuadro que tiene un botón de "COPIAR" automático en la esquina superior derecha
-        st.code(mensaje, language=None)
-        
-        # Opcional: Botón que abre WhatsApp directamente
-        # Esto te ahorra buscar al cliente en tus contactos
-        link_wa = f"https://wa.me/?text={mensaje.replace(' ', '%20').replace('\n', '%0A')}"
-        st.link_button("📲 Enviar directo a WhatsApp", link_wa)
-
+            # --- GENERAR MENSAJE ---
+            mensaje = (
+                f"Hola {nombre}, que gusto saludarte, gracias por la confianza.\n\n"
+                f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
+                f"Fabricación y Ensamble de {proyecto} ${precio_final:,.0f}\n\n"
+                f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
+                f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
+                f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
+            )
+            
+            st.subheader("Copia el mensaje aquí abajo:")
+            # st.code genera el recuadro con el botón de "Copiar" automático
+            st.code(mensaje, language=None)
+            
+            # Botón opcional para abrir WhatsApp directamente
+            link_wa = f"https://wa.me/?text={mensaje.replace(' ', '%20').replace('\n', '%0A')}"
+            st.link_button("📲 Enviar directo a WhatsApp", link_wa)
+            
         except Exception as e:
             st.error(f"Error al guardar: {e}")
     else:
         st.error("⚠️ Por favor rellena el nombre y el proyecto.")
 
-# 6. BOTÓN DE LIMPIEZA TOTAL
-# Al no estar en una función, este botón sí refrescará la página correctamente
+# 6. BOTÓN DE REINICIO
 if st.button("🔄 Nueva Cotización (Limpiar Pantalla)"):
     st.rerun()
