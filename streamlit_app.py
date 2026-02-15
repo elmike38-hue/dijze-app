@@ -26,25 +26,30 @@ st.title("🪚 Carpintería Dijze")
 
 # 4. FORMULARIO
 with st.form("cotizador_form", clear_on_submit=True):
-    nombre = st.text_input("Nombre del Cliente")
-    proyecto = st.text_input("Proyecto")
+    nombre = st.text_input("Nombre del Cliente", placeholder="Ej. Juan Pérez")
+    proyecto = st.text_input("Proyecto", placeholder="Ej. Cocina Integral")
     
     col1, col2 = st.columns(2)
     with col1:
-        maquila = st.number_input("Costo de la maquila", min_value=0.0, step=100.0)
+        # Usamos text_input para que aparezca vacío y sin botones +/-
+        c_maquila_raw = st.text_input("Costo de maquila", placeholder="Solo números")
     with col2:
-        accesorios = st.number_input("Costo en accesorios", min_value=0.0, step=100.0)
+        c_acc_raw = st.text_input("Costo accesorios", placeholder="Solo números")
     
     submit = st.form_submit_button("Generar y Guardar")
 
 # 5. LÓGICA DE GUARDADO Y MENSAJE
 if submit:
-    if nombre and proyecto:
-        inv_base = (maquila + accesorios) / 0.7
-        precio_final = redondear_psicologico_dijze(inv_base)
-        fecha_hoy = datetime.now().strftime("%d/%m/%Y")
-        
+    if nombre and proyecto and c_maquila_raw and c_acc_raw:
         try:
+            # Convertimos el texto a número para el cálculo
+            maquila = float(c_maquila_raw)
+            accesorios = float(c_acc_raw)
+            
+            inv_base = (maquila + accesorios) / 0.7
+            precio_final = redondear_psicologico_dijze(inv_base)
+            fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+            
             # Leer y actualizar Excel
             df_actual = conn.read(ttl=0)
             nueva_fila = pd.DataFrame([{
@@ -69,13 +74,14 @@ if submit:
             )
             
             st.markdown("### 📋 Mensaje para copiar:")
-            # Este bloque crea el cuadro con el botón de copiar automático
             st.code(mensaje, language=None)
             
+        except ValueError:
+            st.error("❌ Por favor ingresa solo números en los costos (sin letras ni símbolos).")
         except Exception as e:
             st.error(f"Error al guardar: {e}")
     else:
-        st.error("⚠️ Por favor rellena el nombre y el proyecto.")
+        st.error("⚠️ Por favor rellena todos los campos.")
 
 # 6. BOTÓN DE REINICIO
 if st.button("🔄 Nueva Cotización (Limpiar Pantalla)"):
