@@ -66,5 +66,7 @@ if submit:
         )
         
         st.text_area("Copia para WhatsApp:", mensaje, height=300)
+        if st.button("Hacer otra cotización"):
+            st.rerun()
     else:
         st.error("Por favor llena los nombres.")
