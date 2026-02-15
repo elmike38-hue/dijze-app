@@ -1,14 +1,12 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 from datetime import datetime
 
-# CONFIGURACIÓN
-st.set_page_config(page_title="Dijze Cotizador", page_icon="🪚")
+st.set_page_config(page_title="Dijze Pro", page_icon="🪚")
 
-# --- AQUÍ PEGA TU URL DE GOOGLE SHEETS ---
-# Importante: El enlace debe terminar en /export?format=csv
-SHEET_ID = "ID_DE_TU_HOJA" # El código largo que sale en la URL de tu Excel
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv"
+# Conectar a Google Sheets usando los Secrets configurados
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 def redondear_psicologico_dijze(numero):
     numero = int(numero)
@@ -27,9 +25,10 @@ st.title("🪚 Carpintería Dijze")
 with st.form("cotizador"):
     nombre_cliente = st.text_input("Nombre del Cliente")
     nombre_proyecto = st.text_input("Proyecto")
-    c_maquila = st.number_input("Costo de la maquila ($)", min_value=0.0)
-    c_accesorios = st.number_input("Costo en accesorios ($)", min_value=0.0)
-    submit = st.form_submit_button("Generar y Guardar en Excel")
+    c_maquila = st.number_input("Costo de la maquila", min_value=0.0, step=100.0)
+    c_accesorios = st.number_input("Costo en accesorios", min_value=0.0, step=100.0)
+    
+    submit = st.form_submit_button("Generar Propuesta y Guardar")
 
 if submit:
     if nombre_cliente and nombre_proyecto:
@@ -37,11 +36,35 @@ if submit:
         precio_final = redondear_psicologico_dijze(inv_base)
         fecha_hoy = datetime.now().strftime("%d/%m/%Y")
         
-        # MOSTRAR MENSAJE
-        st.success(f"Propuesta generada para {nombre_cliente}")
-        st.code(f"Fabricación y Ensamble de {nombre_proyecto}: ${precio_final:,.0f}")
+        # 1. Guardar en Google Sheets
+        nueva_fila = pd.DataFrame([{
+            "Fecha": fecha_hoy,
+            "Cliente": nombre_cliente,
+            "Proyecto": nombre_proyecto,
+            "Inversion_Total": precio_final
+        }])
         
-        # --- LÓGICA DE GUARDADO (SIMPLIFICADA) ---
-        # Nota: Para guardado directo desde el iPhone, lo ideal es usar la 
-        # conexión nativa de Streamlit llamada 'st.connection("gsheets")'.
-        st.info("Para que el guardado sea automático, necesitamos configurar los 'Secrets' en Streamlit Cloud.")
+        # Leer datos actuales y concatenar el nuevo
+        df_existente = conn.read()
+        df_actualizado = pd.concat([df_existente, nueva_fila], ignore_index=True)
+        conn.update(data=df_actualizado)
+        
+        # 2. Mostrar Mensaje de WhatsApp
+        st.success("✅ Guardado en Excel y Mensaje Generado")
+        
+        mensaje = (
+            f"Hola {nombre_cliente}, que gusto saludarte, gracias por la confianza.\n\n"
+            f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
+            f"Fabricación y Ensamble de {nombre_proyecto} ${precio_final:,.0f}\n\n"
+            f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
+            f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
+            f"En este momento podemos ofrecerlo de esta forma ya que hemos estado trabajando en sitio. "
+            f"Además, nuestra agenda de fabricación para las próximas semanas está por llenarse; "
+            f"solo nos quedan unos días disponibles.\n\n"
+            f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días acudir contigo "
+            f"definir dimensiones, materiales y poder comenzar el trabajo en próximos días disponibles?"
+        )
+        
+        st.text_area("Copia para WhatsApp:", mensaje, height=300)
+    else:
+        st.error("Por favor llena los nombres.")
