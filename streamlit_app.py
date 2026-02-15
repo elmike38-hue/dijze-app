@@ -6,15 +6,7 @@ from datetime import datetime
 # 1. CONFIGURACIÓN
 st.set_page_config(page_title="Dijze Pro", page_icon="🪚")
 
-# 2. FUNCIÓN PARA LIMPIAR TODO
-def limpiar_formulario():
-    st.session_state["cliente"] = ""
-    st.session_state["proyecto"] = ""
-    st.session_state["maquila"] = 0.0
-    st.session_state["accesorios"] = 0.0
-    st.rerun()
-
-# 3. REDONDEO
+# 2. FUNCIÓN DE REDONDEO
 def redondear_psicologico_dijze(numero):
     numero = int(numero)
     terminaciones = [36, 38, 39, 63, 68, 69, 83, 86, 89, 93, 96, 98]
@@ -27,63 +19,65 @@ def redondear_psicologico_dijze(numero):
                 return base_centena + t
     return (base_centena + 100) + terminaciones[0]
 
-# 4. CONEXIÓN (Sin caché para evitar sobrescribir)
+# 3. CONEXIÓN
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 st.title("🪚 Carpintería Dijze")
 
-# 5. FORMULARIO CON LLAVES (KEYS) PARA LIMPIEZA
-with st.form("cotizador_form"):
-    st.text_input("Nombre del Cliente", key="cliente")
-    st.text_input("Proyecto", key="proyecto")
+# 4. FORMULARIO SIMPLE
+# Usamos 'key' para que Streamlit sepa qué limpiar
+with st.form("cotizador_form", clear_on_submit=True):
+    nombre = st.text_input("Nombre del Cliente")
+    proyecto = st.text_input("Proyecto")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.number_input("Costo de la maquila", min_value=0.0, step=100.0, key="maquila")
+        maquila = st.number_input("Costo de la maquila", min_value=0.0, step=100.0)
     with col2:
-        st.number_input("Costo en accesorios", min_value=0.0, step=100.0, key="accesorios")
+        accesorios = st.number_input("Costo en accesorios", min_value=0.0, step=100.0)
     
     submit = st.form_submit_button("Generar y Guardar")
 
-# 6. ACCIÓN AL GUARDAR
+# 5. LÓGICA DE GUARDADO Y MENSAJE
 if submit:
-    # Extraemos los valores de las "keys"
-    nombre = st.session_state["cliente"]
-    proy = st.session_state["proyecto"]
-    maq = st.session_state["maquila"]
-    acc = st.session_state["accesorios"]
-
-    if nombre and proy:
-        inv_base = (maq + acc) / 0.7
+    if nombre and proyecto:
+        inv_base = (maquila + accesorios) / 0.7
         precio_final = redondear_psicologico_dijze(inv_base)
         fecha_hoy = datetime.now().strftime("%d/%m/%Y")
         
         try:
-            # Leemos la hoja actual (ttl=0 para datos frescos)
+            # Leer y actualizar Excel
             df_actual = conn.read(ttl=0)
-            
-            # Creamos la fila nueva
             nueva_fila = pd.DataFrame([{
                 "Fecha": fecha_hoy,
                 "Cliente": nombre,
-                "Proyecto": proy,
+                "Proyecto": proyecto,
                 "Inversion_Total": precio_final
             }])
-            
-            # Unimos y subimos todo
             df_final = pd.concat([df_actual, nueva_fila], ignore_index=True)
             conn.update(data=df_final)
             
-            st.success(f"✅ Guardado: {nombre} - ${precio_final:,.0f}")
+            st.success(f"✅ Guardado con éxito")
             
-            # Mensaje WhatsApp
-            mensaje = f"Hola {nombre}, presupuesto para {proy}: ${precio_final:,.0f}. ¿Agendamos?"
-            st.text_area("Copia esto:", mensaje)
+            # --- AQUÍ ESTÁ EL TEXTO DE WHATSAPP ---
+            mensaje = (
+                f"Hola {nombre}, que gusto saludarte, gracias por la confianza.\n\n"
+                f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
+                f"Fabricación y Ensamble de {proyecto} ${precio_final:,.0f}\n\n"
+                f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
+                f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
+                f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
+            )
+            
+            st.subheader("Copia el mensaje para enviarlo:")
+            st.text_area("", mensaje, height=300)
             
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error al guardar: {e}")
     else:
-        st.error("Faltan datos")
+        st.error("⚠️ Por favor rellena el nombre y el proyecto.")
 
-# 7. BOTÓN DE REINICIO REAL
-st.button("🔄 Nueva Cotización (Limpiar todo)", on_click=limpiar_formulario)
+# 6. BOTÓN DE LIMPIEZA TOTAL
+# Al no estar en una función, este botón sí refrescará la página correctamente
+if st.button("🔄 Nueva Cotización (Limpiar Pantalla)"):
+    st.rerun()
