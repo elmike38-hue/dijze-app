@@ -60,18 +60,24 @@ if submit:
             st.success(f"✅ Guardado con éxito")
             
             # --- AQUÍ ESTÁ EL TEXTO DE WHATSAPP ---
-            mensaje = (
-                f"Hola {nombre}, que gusto saludarte, gracias por la confianza.\n\n"
-                f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
-                f"Fabricación y Ensamble de {proyecto} ${precio_final:,.0f}\n\n"
-                f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
-                f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
-                f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
-            )
-            
-            st.subheader("Copia el mensaje para enviarlo:")
-            st.text_area("", mensaje, height=300)
-            
+           mensaje = (
+            f"Hola {nombre}, que gusto saludarte, gracias por la confianza.\n\n"
+            f"Revisando los requerimientos el valor de inversión del proyecto con los acabados requeridos\n"
+            f"Fabricación y Ensamble de {proyecto} ${precio_final:,.0f}\n\n"
+            f"Normalmente, un proyecto de esta naturaleza lo cotizamos un poco más elevado. "
+            f"Sin embargo, tu al ser un cliente recomendado estamos ofreciendo una bonificación especial.\n\n"
+            f"Sabiendo esto, cuéntame, ¿prefieres que agendemos próximos días?"
+        )
+        
+        st.subheader("Propuesta lista:")
+        # st.code crea un cuadro que tiene un botón de "COPIAR" automático en la esquina superior derecha
+        st.code(mensaje, language=None)
+        
+        # Opcional: Botón que abre WhatsApp directamente
+        # Esto te ahorra buscar al cliente en tus contactos
+        link_wa = f"https://wa.me/?text={mensaje.replace(' ', '%20').replace('\n', '%0A')}"
+        st.link_button("📲 Enviar directo a WhatsApp", link_wa)
+
         except Exception as e:
             st.error(f"Error al guardar: {e}")
     else:
